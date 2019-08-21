@@ -1,0 +1,274 @@
+﻿
+@*Notes:
+    Ascending-Descending arrowheads are copy-pasted from https://unicode-search.net/unicode-namesearch.pl?term=ARROWHEAD since I can't figure out how to type them
+    *@
+
+    <div class="container ml-0 mr-0 pl-0 pr-0">
+
+        @*number of records dropdown*@
+        <div class="row ml-0 mr-0">
+            <div class="row ml-0 mr-0">
+                <select class="form-control" bind="@NumberOfRecordsToShow" @onchange="@(e => SetNumberOfRecordsToShow(e))" >
+                    <option value="10">10 records</option>
+                    <option value="25">25 records</option>
+                    <option value="50">50 records</option>
+                    <option value="100">100 records</option>
+                </select>
+            </div>
+
+            @*search box*@
+            <div class="row ml-auto mr-0">
+                <div class="input-group">
+                    <input type="search" placeholder="Search" class="form-control" @oninput="@(e => FilterDataView(e))" />
+                </div>
+            </div>
+        </div>
+
+        <br />
+
+        @*table*@
+        <table class="table table-striped table-hover @table_sm">
+
+            <thead>
+                <tr>
+                    @foreach (DataColumn dc in IncomingDataView.Table.Columns)
+                    {
+                        <th>
+                            <a>
+                                <div style="cursor:pointer;" @onclick="@(e => SortDataView(@dc.ColumnName))">
+                                    @{if (dc.ColumnName == CurrentSortColumn)
+                                    {
+                                        if (CurrentSortDirection == "ASC")
+                                        { <span>@dc.ColumnName  ⌃</span> }
+                                        else if (CurrentSortDirection == "DESC")
+                                        { <span>@dc.ColumnName  ⌄</span>}
+                                    }
+                                    else { <span>@dc.ColumnName</span> }
+                                    }
+                                </div>
+                            </a>
+                        </th>
+                    }
+                    @*command column*@
+                    <th></th>
+                </tr>
+            </thead>
+
+            <tbody>
+                @{ int i = 0; }
+                @{ foreach (DataRowView rowview in IncomingDataView)
+                    {
+                        if ((i >= RowStart) && (i <= (RowStart + NumberOfRecordsToShow - 1)))
+                        {
+                            <tr>
+                                @foreach (object field in rowview.Row.ItemArray)
+                                {
+                                    <td>@field</td>
+                                }
+                                <td>
+                                    <button class="btn btn-sm btn-outline-secondary">Edit</button>
+                                </td>
+                            </tr>
+                        }
+                        i++;
+                    }
+                }
+            </tbody>
+        </table>
+
+        @*pagination*@
+    <div class="float-right btn-toolbar">
+        @{
+            int PageNumber = FirstPageToDisplay;
+
+            //first/previous jump buttons
+            if (CurrentPageNumber == 1)
+            {
+                <button class="btn btn-outline-secondary disabled" style="box-shadow:none; cursor:default;" id="JumpToFirstPage"><strong>|〈</strong></button>
+                <button class="btn btn-outline-secondary disabled" style="box-shadow:none; cursor:default;" id="PreviousPage"><strong>〈</strong></button>
+            }
+            else if (CurrentPageNumber != 1)
+            {
+                <button class="btn btn-outline-secondary" style="box-shadow:none;" id="JumpToFirstPage" @onclick="@(() => PageDataView(1))"><strong>|〈</strong></button>
+                <button class="btn btn-outline-secondary" style="box-shadow:none;" id="PreviousPage" @onclick="@(() => PageDataView(CurrentPageNumber-1))"><strong>〈</strong></button>
+            }
+
+            while (PageNumber <= LastPageToDisplay)
+            {
+                //use pagenumber variable inside loop otherwise the lambda expression can only pick up the final value
+                int _PageNumber = PageNumber;
+                if (_PageNumber == CurrentPageNumber)
+                {
+                    <button class="btn btn-outline-secondary active" style="box-shadow:none;" id="@PageNumber" bind-value="@PageNumber" @onclick="@(() => PageDataView(_PageNumber))">@_PageNumber</button>
+                }
+                else
+                {
+                    <button class="btn btn-outline-secondary" style="box-shadow:none;" id="@PageNumber" bind-value="@PageNumber" @onclick="@(() => PageDataView(_PageNumber))">@_PageNumber</button>
+                }
+
+                PageNumber++;
+
+            }
+
+            //next/last jump buttons
+            if (CurrentPageNumber == TotalPages)
+            {
+                <button class="btn btn-outline-secondary disabled" style="box-shadow:none; cursor:default;" id="JumpToFirstPage"><strong>〉</strong></button>
+                <button class="btn btn-outline-secondary disabled" style="box-shadow:none; cursor:default;" id="PreviousPage"><strong>〉|</strong></button>
+            }
+            else if (CurrentPageNumber != TotalPages)
+            {
+                <button class="btn btn-outline-secondary" style="box-shadow:none;" id="JumpToFirstPage" @onclick="@(() => PageDataView(CurrentPageNumber+1))"><strong>〉</strong></button>
+                <button class="btn btn-outline-secondary" style="box-shadow:none;" id="PreviousPage" @onclick="@(() => PageDataView(TotalPages))"><strong>〉|</strong></button>
+            }
+
+        }
+    </div>
+
+    </div>
+
+
+
+
+@code {
+
+    [Parameter]
+    public DataView IncomingDataView { get; set; }
+
+    [Parameter]
+    public string table_sm { get; set; }
+
+    [Parameter]
+    public string CurrentSortColumn { get; set; }       //used to set sorting direction arrow
+
+    [Parameter]
+    public string CurrentSortDirection { get; set; }    //used to set sorting direction arrow
+
+    int RowStart = 0;
+    int NumberOfRecordsToShow = 10;
+    int CurrentPageNumber;
+    int TotalPages;
+    int FirstPageToDisplay;
+    int LastPageToDisplay;
+
+    protected override void OnInitialized()
+    {
+        PageDataView(1);
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (!string.IsNullOrWhiteSpace(CurrentSortColumn) && !string.IsNullOrWhiteSpace(CurrentSortDirection))
+        {
+            IncomingDataView.Sort = CurrentSortColumn + " " + CurrentSortDirection;
+        }
+    }
+
+    private void SetNumberOfRecordsToShow(UIChangeEventArgs e)
+    {
+        NumberOfRecordsToShow = int.Parse(e.Value.ToString());
+        PageDataView(1);
+    }
+
+    public void FilterDataView(UIChangeEventArgs e)
+    {
+
+        string FilterString = "";
+        foreach (DataColumn dc in IncomingDataView.Table.Columns)
+        {
+            if (dc.Ordinal == 0)
+            {
+                FilterString = "Convert(" + dc.ColumnName + ",System.String) LIKE '%" + e.Value.ToString() + "%'";
+            }
+            else
+            {
+                FilterString = FilterString + " " + "OR Convert(" + dc.ColumnName + ",System.String) LIKE '%" + e.Value.ToString() + "%'";
+            }
+
+        }
+
+        //set filter
+        IncomingDataView.RowFilter = FilterString;
+
+        //regenerate paging with the first page selected, otherwise the paging will regenerate but the currently selected page will remain selected even if it's past the end of the new paging
+        PageDataView(1);
+
+    }
+
+    public void SortDataView(string _CurrentSortColumn)
+    {
+
+        CurrentSortColumn = _CurrentSortColumn;
+
+        //first sort
+        if (string.IsNullOrWhiteSpace(IncomingDataView.Sort))
+        {
+            CurrentSortDirection = "ASC";
+        }
+
+        //subsequent sorts
+        else
+        {
+            string[] LastSort = IncomingDataView.Sort.Split();
+            string LastSortColumn = LastSort[0];
+            string LastSortDirection = LastSort[1];
+
+            //same column being sorted
+            if (_CurrentSortColumn == LastSortColumn)
+            {
+                CurrentSortDirection = LastSortDirection == "ASC" ? "DESC" : "ASC";
+
+            }
+            else
+            {
+                CurrentSortDirection = "ASC";
+            }
+        }
+
+        IncomingDataView.Sort = CurrentSortColumn + " " + CurrentSortDirection;
+
+    }
+
+    public void PageDataView(int PageNumber)
+    {
+        //determine rowstart for use in displaying the correct records on each page
+        RowStart = ((PageNumber * NumberOfRecordsToShow) - NumberOfRecordsToShow);
+
+        //set CurrentPageNumber for use in displaying the correct set of records in pagination
+        CurrentPageNumber = PageNumber;
+
+        //set TotalPages
+        if (IncomingDataView.Count > 0)
+        {
+            TotalPages = ((IncomingDataView.Count%NumberOfRecordsToShow) > 0) ? (IncomingDataView.Count/NumberOfRecordsToShow)+1 : IncomingDataView.Count/NumberOfRecordsToShow;
+        }
+        else
+        {
+            //set total pages to 1 so that even if a filter eliminates all records there is still a button for page 1
+            TotalPages = 1;
+        }
+
+        //set FirstPageToDisplay and LastPageToDisplay when within the first three pages
+        if (CurrentPageNumber <= 3)
+        {
+            FirstPageToDisplay = 1;
+            LastPageToDisplay = (TotalPages < 5) ? TotalPages : 5;
+        }
+
+        //set FirstPageToDisplay and LastPageToDisplay when within the last three pages
+        else if (TotalPages - CurrentPageNumber < 3)
+        {
+            FirstPageToDisplay = ((TotalPages - 5) < 0) ? 1 : TotalPages - 5;
+            LastPageToDisplay = TotalPages;
+        }
+
+        //set FirstPageToDisplay and LastPageToDisplay when not within three pages of either the first page or last page
+        else
+        {
+            FirstPageToDisplay = CurrentPageNumber - 2;
+            LastPageToDisplay = CurrentPageNumber + 2;
+        }
+
+    }
+
+}

@@ -1,0 +1,40 @@
+﻿@page "/"
+
+<h2>BlazorDataView Component For Server-Side Blazor</h2>
+
+<br />
+
+<h4>Toggle table options</h4>
+
+
+<br />
+<br />
+
+<BlazorDataView IncomingDataView="@dt.AsDataView()"></BlazorDataView>
+
+
+@code {
+
+    string ConnectionString = "Data Source=Example.db";
+
+    public DataTable dt = new DataTable();
+
+    protected override void OnInitialized()
+    {
+        GetDataTable();
+    }
+
+    public DataTable GetDataTable()
+    {
+        using (SQLiteConnection conn = new SQLiteConnection(ConnectionString))
+        using (SQLiteCommand cmd = new SQLiteCommand("SELECT * FROM Employees;"))
+        {
+            cmd.Connection=conn;
+            SQLiteDataAdapter adapter = new SQLiteDataAdapter(cmd);
+            conn.Open();
+            adapter.Fill(dt);
+            return dt;
+        }
+    }
+
+}
